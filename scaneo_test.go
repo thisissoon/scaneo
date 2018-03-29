@@ -308,56 +308,136 @@ func TestGenFile(t *testing.T) {
 		"scanUnexporteds",
 	}
 
-	outFile := filepath.Join(os.TempDir(), fmt.Sprintf("scaneo-test-%d", time.Now().UnixNano()))
-
-	var noToks []structToken
-	if err := genFile(outFile, "testing", true, noToks); err == nil {
-		t.Error("no struct tokens passed")
-		t.Error("should be error")
-		t.FailNow()
+	tt := []struct {
+		name          string
+		outFile       bool
+		tokens        []structToken
+		unexport      bool
+		funcs         bool
+		assert        func(*testing.T, error)
+		expectedFuncs []string
+	}{
+		{
+			"no tokens",
+			true,
+			[]structToken{},
+			true,
+			false,
+			func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("no struct tokens passed")
+					t.Error("should be error")
+					t.FailNow()
+				}
+			},
+			expectedFuncNames,
+		},
+		{
+			"no output file",
+			false,
+			toks,
+			true,
+			false,
+			func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("no output file path passed")
+					t.Error("should be error")
+					t.FailNow()
+				}
+			},
+			expectedFuncNames,
+		},
+		{
+			"scan funcs unexported",
+			true,
+			toks,
+			true,
+			false,
+			func(t *testing.T, err error) {
+				if err != nil {
+					t.Error(err)
+					t.FailNow()
+				}
+			},
+			expectedFuncNames,
+		},
+		{
+			"sql helper funcs",
+			true,
+			toks,
+			true,
+			true,
+			func(t *testing.T, err error) {
+				if err != nil {
+					t.Error(err)
+					t.FailNow()
+				}
+			},
+			[]string{
+				"scanExported",
+				"scanExporteds",
+				"SelectExported",
+				"SelectExporteds",
+				"sliceExported",
+				"InsertExported",
+				"UpdateExported",
+				"scanUnexported",
+				"scanUnexporteds",
+				"SelectUnexported",
+				"SelectUnexporteds",
+				"sliceUnexported",
+				"InsertUnexported",
+				"UpdateUnexported",
+			},
+		},
 	}
-	var noOutFile string
-	if err := genFile(noOutFile, "testing", true, toks); err == nil {
-		t.Error("no output file path passed")
-		t.Error("should be error")
-		t.FailNow()
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			var outFile string
+			if tc.outFile {
+				outFile = filepath.Join(
+					os.TempDir(),
+					fmt.Sprintf("scaneo-test-%d", time.Now().UnixNano()))
+			}
+			// genFile(file, package, unexport, tokens, funcs)
+			err := genFile(outFile, "testing", tc.unexport, tc.tokens, tc.funcs)
+			defer os.Remove(outFile) // comment this line to examine generated code
+
+			tc.assert(t, err)
+			if err != nil {
+				return
+			}
+
+			fset := token.NewFileSet()
+			astf, err := parser.ParseFile(fset, outFile, nil, 0)
+			if err != nil {
+				t.Error(err)
+				t.FailNow()
+			}
+
+			scanFuncs := make([]string, 0, len(toks))
+			for _, dec := range astf.Decls {
+				funcDecl, isFuncDecl := dec.(*ast.FuncDecl)
+				if !isFuncDecl {
+					continue
+				}
+
+				scanFuncs = append(scanFuncs, funcDecl.Name.String())
+			}
+
+			if len(tc.expectedFuncs) != len(scanFuncs) {
+				t.Error("unexpected number of scan functions found")
+				t.Errorf("expected: %d; found: %d\n", len(tc.expectedFuncs), len(scanFuncs))
+				t.FailNow()
+			}
+
+			for i := range tc.expectedFuncs {
+				if tc.expectedFuncs[i] != scanFuncs[i] {
+					t.Error("unexpected scan function found")
+					t.Errorf("expected: %s; found: %s\n", tc.expectedFuncs[i], scanFuncs[i])
+				}
+			}
+		})
 	}
-
-	// genFile(file, package, unexport, tokens)
-	if err := genFile(outFile, "testing", true, toks); err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	defer os.Remove(outFile) // comment this line to examin generated code
-
-	fset := token.NewFileSet()
-	astf, err := parser.ParseFile(fset, outFile, nil, 0)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	scanFuncs := make([]string, 0, len(toks))
-	for _, dec := range astf.Decls {
-		funcDecl, isFuncDecl := dec.(*ast.FuncDecl)
-		if !isFuncDecl {
-			continue
-		}
-
-		scanFuncs = append(scanFuncs, funcDecl.Name.String())
-	}
-
-	if len(toks)*2 != len(scanFuncs) {
-		t.Error("unexpected number of scan functions found")
-		t.Errorf("expected: %d; found: %d\n", len(toks)*2, len(scanFuncs))
-		t.FailNow()
-	}
-
-	for i := range expectedFuncNames {
-		if expectedFuncNames[i] != scanFuncs[i] {
-			t.Error("unexpected scan function found")
-			t.Errorf("expected: %s; found: %s\n", expectedFuncNames[i], scanFuncs[i])
-		}
-	}
-
 }

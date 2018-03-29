@@ -12,7 +12,7 @@ Install or upgrade Scaneo with this command.
 go get -u github.com/variadico/scaneo
 ```
 
-Otherwise, check out the 
+Otherwise, check out the
 [releases page](https://github.com/variadico/scaneo/releases/latest).
 
 ## Usage
@@ -35,6 +35,9 @@ scaneo [options] paths...
 -w, -whitelist
     Only include structs specified in case-sensitive, comma-delimited
     string.
+
+-f, -funcs
+    Generate SQL helper functions. Default is false.
 
 -v, -version
     Print version and exit.
