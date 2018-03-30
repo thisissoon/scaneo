@@ -39,9 +39,11 @@ OPTIONS
     -f, -funcs
         Generate SQL helper functions.
 
+    -i, -import
+        Override package to import type from.
+
     -v, -version
         Print version and exit.
-
 
     -h, -help
         Print help and exit.
@@ -89,6 +91,7 @@ func main() {
 	unexport := flag.Bool("u", false, "")
 	whitelist := flag.String("w", "", "")
 	genFuncs := flag.Bool("f", false, "")
+	pkgImport := flag.String("i", "", "")
 	version := flag.Bool("v", false, "")
 	help := flag.Bool("h", false, "")
 	flag.StringVar(outFilename, "output", "scans.go", "")
@@ -96,6 +99,7 @@ func main() {
 	flag.BoolVar(unexport, "unexport", false, "")
 	flag.StringVar(whitelist, "whitelist", "", "")
 	flag.BoolVar(genFuncs, "funcs", false, "")
+	flag.StringVar(pkgImport, "import", "", "")
 	flag.BoolVar(version, "version", false, "")
 	flag.BoolVar(help, "help", false, "")
 	flag.Usage = func() { log.Println(usageText) } // call on flag error
@@ -139,7 +143,7 @@ func main() {
 		structToks = append(structToks, toks...)
 	}
 
-	if err := genFile(*outFilename, *packName, *unexport, structToks, *genFuncs); err != nil {
+	if err := genFile(*outFilename, *packName, *unexport, structToks, *genFuncs, *pkgImport); err != nil {
 		log.Fatal("couldn't generate file:", err)
 	}
 }
@@ -347,7 +351,7 @@ func parseStar(fieldType *ast.StarExpr) string {
 	return fmt.Sprintf("*%s", starType)
 }
 
-func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bool) error {
+func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bool, pkgImport string) error {
 	if len(toks) < 1 {
 		return errors.New("no structs found")
 	}
@@ -363,11 +367,13 @@ func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bo
 		Tokens      []structToken
 		Visibility  string
 		Funcs       bool
+		ImportPkg   string
 	}{
 		PackageName: pkg,
 		Visibility:  "S",
 		Tokens:      toks,
 		Funcs:       genFuncs,
+		ImportPkg:   pkgImport,
 	}
 
 	if unexport {
@@ -375,7 +381,22 @@ func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bo
 		data.Visibility = "s"
 	}
 
-	fnMap := template.FuncMap{"title": strings.Title}
+	// Construct type prefix from pkgImport
+	var typePrefix string
+	if pkgImport != "" {
+		pkgPathParts := strings.Split(pkgImport, "/")
+		typePrefix = pkgPathParts[len(pkgPathParts)-1]
+	}
+
+	fnMap := template.FuncMap{
+		"title": strings.Title,
+		"pkg": func(s string) string {
+			if typePrefix != "" {
+				return fmt.Sprintf("%s.%s", typePrefix, s)
+			}
+			return s
+		},
+	}
 	scansTmpl, err := template.New("scans").Funcs(fnMap).Parse(scansText)
 	if err != nil {
 		return err
