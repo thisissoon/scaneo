@@ -314,6 +314,7 @@ func TestGenFile(t *testing.T) {
 		tokens        []structToken
 		unexport      bool
 		funcs         bool
+		pkgImport     string
 		assert        func(*testing.T, error)
 		expectedFuncs []string
 	}{
@@ -323,6 +324,7 @@ func TestGenFile(t *testing.T) {
 			[]structToken{},
 			true,
 			false,
+			"",
 			func(t *testing.T, err error) {
 				if err == nil {
 					t.Error("no struct tokens passed")
@@ -338,6 +340,7 @@ func TestGenFile(t *testing.T) {
 			toks,
 			true,
 			false,
+			"",
 			func(t *testing.T, err error) {
 				if err == nil {
 					t.Error("no output file path passed")
@@ -353,6 +356,7 @@ func TestGenFile(t *testing.T) {
 			toks,
 			true,
 			false,
+			"",
 			func(t *testing.T, err error) {
 				if err != nil {
 					t.Error(err)
@@ -367,6 +371,7 @@ func TestGenFile(t *testing.T) {
 			toks,
 			true,
 			true,
+			"",
 			func(t *testing.T, err error) {
 				if err != nil {
 					t.Error(err)
@@ -390,6 +395,21 @@ func TestGenFile(t *testing.T) {
 				"UpdateUnexported",
 			},
 		},
+		{
+			"pkg import",
+			true,
+			toks,
+			true,
+			false,
+			"testsvc/storage/user",
+			func(t *testing.T, err error) {
+				if err != nil {
+					t.Error(err)
+					t.FailNow()
+				}
+			},
+			expectedFuncNames,
+		},
 	}
 
 	for _, tc := range tt {
@@ -401,7 +421,7 @@ func TestGenFile(t *testing.T) {
 					fmt.Sprintf("scaneo-test-%d", time.Now().UnixNano()))
 			}
 			// genFile(file, package, unexport, tokens, funcs)
-			err := genFile(outFile, "testing", tc.unexport, tc.tokens, tc.funcs)
+			err := genFile(outFile, "testing", tc.unexport, tc.tokens, tc.funcs, tc.pkgImport)
 			defer os.Remove(outFile) // comment this line to examine generated code
 
 			tc.assert(t, err)

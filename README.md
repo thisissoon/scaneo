@@ -39,6 +39,9 @@ scaneo [options] paths...
 -f, -funcs
     Generate SQL helper functions. Default is false.
 
+-i, -import
+    Override package to import type from.
+
 -v, -version
     Print version and exit.
 
