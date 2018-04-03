@@ -7,21 +7,21 @@ package {{.PackageName}}
 
 import "database/sql"
 
-{{range .Tokens}}func {{$.Visibility}}can{{title .Name}}(r *sql.Row) ({{.Name}}, error) {
-	var s {{.Name}}
+{{range .Tokens}}func {{$.Visibility}}can{{title .Name}}(r *sql.Row) (*{{.Name}}, error) {
+	var s *{{.Name}}
 	if err := r.Scan({{range .Fields}}
 		&s.{{.Name}},{{end}}
 	); err != nil {
-		return {{.Name}}{}, err
+		return &{{.Name}}{}, err
 	}
 	return s, nil
 }
 
-func {{$.Visibility}}can{{title .Name}}s(rs *sql.Rows) ([]{{.Name}}, error) {
-	structs := make([]{{.Name}}, 0, 16)
+func {{$.Visibility}}can{{title .Name}}s(rs *sql.Rows) ([]*{{.Name}}, error) {
+	structs := make([]*{{.Name}}, 0, 16)
 	var err error
 	for rs.Next() {
-		var s {{.Name}}
+		var s *{{.Name}}
 		if err = rs.Scan({{range .Fields}}
 			&s.{{.Name}},{{end}}
 		); err != nil {
@@ -34,6 +34,43 @@ func {{$.Visibility}}can{{title .Name}}s(rs *sql.Rows) ([]{{.Name}}, error) {
 	}
 	return structs, nil
 }
+{{if $.Funcs}}
+// Select{{title .Name}} selects a single {{title .Name}} row from the database
+func Select{{title .Name}}(db *sql.DB, query string, args ...interface{}) (*{{title .Name}}, error) {
+	row := db.QueryRow(query, args...)
+	return {{$.Visibility}}can{{title .Name}}(row)
+}
 
-{{end}}{{end}}`
+// Select{{title .Name}}s selects multiple {{title .Name}} rows from the database
+func Select{{title .Name}}s(db *sql.DB, query string, args ...interface{}) ([]*{{title .Name}}, error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return {{$.Visibility}}can{{title .Name}}s(rows)
+}
+
+// slice{{title .Name}} returns a slice of arguments from {{title .Name}} struct values
+func slice{{title .Name}}(v *{{title .Name}}) []interface{} {
+	return []interface{}{ {{range .Fields}}
+		&v.{{.Name}},{{end}}
+	}
+}
+
+// Insert{{title .Name}} inserts a single {{title .Name}} row
+func Insert{{title .Name}}(db *sql.DB, query string, v *{{title .Name}}) error {
+	_, err := db.Exec(query, slice{{title .Name}}(v)[1:]...)
+	return err
+}
+
+// Update{{title .Name}} updates a single {{title .Name}} row
+func Update{{title .Name}}(db *sql.DB, query string, v *{{title .Name}}) error {
+	args := slice{{title .Name}}(v)[1:]
+	args = append(args, v.ID)
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+{{end}}{{end}}{{end}}`
 )

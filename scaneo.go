@@ -36,8 +36,12 @@ OPTIONS
         Only include structs specified in case-sensitive, comma-delimited
         string.
 
+    -f, -funcs
+        Generate SQL helper functions.
+
     -v, -version
         Print version and exit.
+
 
     -h, -help
         Print help and exit.
@@ -84,12 +88,14 @@ func main() {
 	packName := flag.String("p", "current directory", "")
 	unexport := flag.Bool("u", false, "")
 	whitelist := flag.String("w", "", "")
+	genFuncs := flag.Bool("f", false, "")
 	version := flag.Bool("v", false, "")
 	help := flag.Bool("h", false, "")
 	flag.StringVar(outFilename, "output", "scans.go", "")
 	flag.StringVar(packName, "package", "current directory", "")
 	flag.BoolVar(unexport, "unexport", false, "")
 	flag.StringVar(whitelist, "whitelist", "", "")
+	flag.BoolVar(genFuncs, "funcs", false, "")
 	flag.BoolVar(version, "version", false, "")
 	flag.BoolVar(help, "help", false, "")
 	flag.Usage = func() { log.Println(usageText) } // call on flag error
@@ -133,7 +139,7 @@ func main() {
 		structToks = append(structToks, toks...)
 	}
 
-	if err := genFile(*outFilename, *packName, *unexport, structToks); err != nil {
+	if err := genFile(*outFilename, *packName, *unexport, structToks, *genFuncs); err != nil {
 		log.Fatal("couldn't generate file:", err)
 	}
 }
@@ -341,7 +347,7 @@ func parseStar(fieldType *ast.StarExpr) string {
 	return fmt.Sprintf("*%s", starType)
 }
 
-func genFile(outFile, pkg string, unexport bool, toks []structToken) error {
+func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bool) error {
 	if len(toks) < 1 {
 		return errors.New("no structs found")
 	}
@@ -356,10 +362,12 @@ func genFile(outFile, pkg string, unexport bool, toks []structToken) error {
 		PackageName string
 		Tokens      []structToken
 		Visibility  string
+		Funcs       bool
 	}{
 		PackageName: pkg,
 		Visibility:  "S",
 		Tokens:      toks,
+		Funcs:       genFuncs,
 	}
 
 	if unexport {
