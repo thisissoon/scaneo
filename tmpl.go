@@ -11,7 +11,7 @@ import (
 )
 {{range .Tokens}}
 func {{$.Visibility}}can{{title .Name}}(r *sql.Row) (*{{pkg .Name}}, error) {
-	var s *{{pkg .Name}}
+	s := &{{pkg .Name}}{}
 	if err := r.Scan({{range .Fields}}
 		&s.{{.Name}},{{end}}
 	); err != nil {
@@ -24,7 +24,7 @@ func {{$.Visibility}}can{{title .Name}}s(rs *sql.Rows) ([]*{{pkg .Name}}, error)
 	structs := make([]*{{pkg .Name}}, 0, 16)
 	var err error
 	for rs.Next() {
-		var s *{{pkg .Name}}
+		s := &{{pkg .Name}}{}
 		if err = rs.Scan({{range .Fields}}
 			&s.{{.Name}},{{end}}
 		); err != nil {
