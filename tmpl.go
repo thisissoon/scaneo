@@ -7,13 +7,18 @@ package {{.PackageName}}
 
 import (
 	"database/sql"{{ if .ImportPkg }}
-	"{{.ImportPkg}}"{{end}}
+	"{{.ImportPkg}}"{{end}}{{ if .NeedDriverPkg }}
+	"github.com/lib/pq"{{end}}
 )
 {{range .Tokens}}
 func {{$.Visibility}}can{{title .Name}}(r *sql.Row) (*{{pkg .Name}}, error) {
 	s := &{{pkg .Name}}{}
 	if err := r.Scan({{range .Fields}}
-		&s.{{.Name}},{{end}}
+		{{if .IsArray -}}
+		pq.Array(&s.{{.Name}})
+		{{- else -}}
+		&s.{{.Name}}
+		{{- end -}},{{end}}
 	); err != nil {
 		return &{{pkg .Name}}{}, err
 	}
@@ -26,7 +31,11 @@ func {{$.Visibility}}can{{title .Name}}s(rs *sql.Rows) ([]*{{pkg .Name}}, error)
 	for rs.Next() {
 		s := &{{pkg .Name}}{}
 		if err = rs.Scan({{range .Fields}}
-			&s.{{.Name}},{{end}}
+			{{if .IsArray -}}
+			pq.Array(&s.{{.Name}})
+			{{- else -}}
+			&s.{{.Name}}
+			{{- end -}},{{end}}
 		); err != nil {
 			return nil, err
 		}

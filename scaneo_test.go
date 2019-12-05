@@ -153,10 +153,10 @@ var (
 			{
 				Name: "slices",
 				Fields: []fieldToken{
-					{Name: "a", Type: "[]bool"},
-					{Name: "b", Type: "[]time.Time"},
-					{Name: "c", Type: "[]*byte"},
-					{Name: "d", Type: "[]*sql.NullString"},
+					{Name: "a", Type: "[]bool", IsArray: true},
+					{Name: "b", Type: "[]time.Time", IsArray: true},
+					{Name: "c", Type: "[]*byte", IsArray: true},
+					{Name: "d", Type: "[]*sql.NullString", IsArray: true},
 				},
 			},
 			{
@@ -284,6 +284,13 @@ func TestParseCode(t *testing.T) {
 					t.FailNow()
 				}
 
+				if structToks[i].Fields[j].IsArray != toks[i].Fields[j].IsArray {
+					t.Error("unexpected isArray")
+					t.Error("file:", fPath)
+					t.Error("struct:", structToks[i].Name)
+					t.Errorf("expected: %v; found: %v\n", structToks[i].Fields[j].IsArray, toks[i].Fields[j].IsArray)
+				}
+
 				if structToks[i].Fields[j].Type != toks[i].Fields[j].Type {
 					t.Error("unexpected struct field type")
 					t.Error("file:", fPath)
@@ -319,66 +326,66 @@ func TestGenFile(t *testing.T) {
 		expectedFuncs []string
 	}{
 		{
-			"no tokens",
-			true,
-			[]structToken{},
-			true,
-			false,
-			"",
-			func(t *testing.T, err error) {
+			name:      "no tokens",
+			outFile:   true,
+			tokens:    []structToken{},
+			unexport:  true,
+			funcs:     false,
+			pkgImport: "",
+			assert: func(t *testing.T, err error) {
 				if err == nil {
 					t.Error("no struct tokens passed")
 					t.Error("should be error")
 					t.FailNow()
 				}
 			},
-			expectedFuncNames,
+			expectedFuncs: expectedFuncNames,
 		},
 		{
-			"no output file",
-			false,
-			toks,
-			true,
-			false,
-			"",
-			func(t *testing.T, err error) {
+			name:      "no output file",
+			outFile:   false,
+			tokens:    toks,
+			unexport:  true,
+			funcs:     false,
+			pkgImport: "",
+			assert: func(t *testing.T, err error) {
 				if err == nil {
 					t.Error("no output file path passed")
 					t.Error("should be error")
 					t.FailNow()
 				}
 			},
-			expectedFuncNames,
+			expectedFuncs: expectedFuncNames,
 		},
 		{
-			"scan funcs unexported",
-			true,
-			toks,
-			true,
-			false,
-			"",
-			func(t *testing.T, err error) {
+			name:      "scan funcs unexported",
+			outFile:   true,
+			tokens:    toks,
+			unexport:  true,
+			funcs:     false,
+			pkgImport: "",
+			assert: func(t *testing.T, err error) {
 				if err != nil {
 					t.Error(err)
 					t.FailNow()
 				}
 			},
-			expectedFuncNames,
+			expectedFuncs: expectedFuncNames,
 		},
 		{
-			"sql helper funcs",
-			true,
-			toks,
-			true,
-			true,
-			"",
-			func(t *testing.T, err error) {
+			name:      "sql helper funcs",
+			outFile:   true,
+			tokens:    toks,
+			unexport:  true,
+			funcs:     true,
+			pkgImport: "",
+			assert: func(t *testing.T, err error) {
 				if err != nil {
 					t.Error(err)
 					t.FailNow()
 				}
 			},
-			[]string{
+			expectedFuncs: []string{
 				"scanExported",
 				"scanExporteds",
 				"SelectExported",
@@ -396,22 +403,39 @@ func TestGenFile(t *testing.T) {
 			},
 		},
 		{
-			"pkg import",
-			true,
-			toks,
-			true,
-			false,
-			"testsvc/storage/user",
-			func(t *testing.T, err error) {
+			name:      "pkg import",
+			outFile:   true,
+			tokens:    toks,
+			unexport:  true,
+			funcs:     false,
+			pkgImport: "testsvc/storage/user",
+			assert: func(t *testing.T, err error) {
 				if err != nil {
 					t.Error(err)
 					t.FailNow()
 				}
 			},
-			expectedFuncNames,
+			expectedFuncs: expectedFuncNames,
+		},
+		{
+			name:      "arrays",
+			outFile:   true,
+			tokens:    fileStructsMap[testFiles[2]][4:5],
+			unexport:  true,
+			funcs:     false,
+			pkgImport: "",
+			assert: func(t *testing.T, err error) {
+				if err != nil {
+					t.Error(err)
+					t.FailNow()
+				}
+			},
+			expectedFuncs: []string{
+				"scanSlices",
+				"scanSlicess",
+			},
 		},
 	}
-
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			var outFile string

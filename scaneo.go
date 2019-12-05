@@ -74,8 +74,9 @@ NOTES
 )
 
 type fieldToken struct {
-	Name string
-	Type string
+	Name    string
+	Type    string
+	IsArray bool
 }
 
 type structToken struct {
@@ -260,6 +261,7 @@ func parseCode(source string, commaList string) ([]structToken, error) {
 				}
 
 				var fieldType string
+				var isArray bool
 
 				// get field type
 				switch typeToken := fieldLine.Type.(type) {
@@ -272,6 +274,7 @@ func parseCode(source string, commaList string) ([]structToken, error) {
 				case *ast.ArrayType:
 					// arrays
 					fieldType = parseArray(typeToken)
+					isArray = true
 				case *ast.StarExpr:
 					// pointers
 					fieldType = parseStar(typeToken)
@@ -284,6 +287,7 @@ func parseCode(source string, commaList string) ([]structToken, error) {
 				// apply type to all variables declared in this line
 				for i := range fieldToks {
 					fieldToks[i].Type = fieldType
+					fieldToks[i].IsArray = isArray
 				}
 
 				structTok.Fields = append(structTok.Fields, fieldToks...)
@@ -362,18 +366,29 @@ func genFile(outFile, pkg string, unexport bool, toks []structToken, genFuncs bo
 	}
 	defer fout.Close()
 
+	hasArrays := false
+	for _, tok := range toks {
+		for _, field := range tok.Fields {
+			if field.IsArray {
+				hasArrays = true
+			}
+		}
+	}
+
 	data := struct {
-		PackageName string
-		Tokens      []structToken
-		Visibility  string
-		Funcs       bool
-		ImportPkg   string
+		PackageName   string
+		Tokens        []structToken
+		Visibility    string
+		Funcs         bool
+		ImportPkg     string
+		NeedDriverPkg bool
 	}{
-		PackageName: pkg,
-		Visibility:  "S",
-		Tokens:      toks,
-		Funcs:       genFuncs,
-		ImportPkg:   pkgImport,
+		PackageName:   pkg,
+		Visibility:    "S",
+		Tokens:        toks,
+		Funcs:         genFuncs,
+		ImportPkg:     pkgImport,
+		NeedDriverPkg: hasArrays,
 	}
 
 	if unexport {
